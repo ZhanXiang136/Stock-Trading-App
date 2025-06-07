@@ -1,0 +1,29 @@
+Activate Virtual Environment
+
+Mac
+source venv/bin/activate
+
+Windows CMD
+venv\Scripts\activate.bat
+
+Windows Powershell
+.\venv\Scripts\Activate.ps1
+
+Deactivate Virtual Environment
+deactivate
+
+Freeze Requirements
+pip freeze > requirements.txt
+
+Alpaca API
+https://docs.alpaca.markets/reference/authentication-2
+
+Run Front End
+cd frontend
+npx create-react-app .
+npm install chart.js react-chartjs-2
+npm start
+
+Run backend
+pip install fastapi uvicorn yfinance python-dotenv alpaca-trade-api
+uvicorn backend.performance_api.main:app --reload
