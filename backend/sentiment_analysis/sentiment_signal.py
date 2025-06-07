@@ -54,7 +54,7 @@ if __name__ == "__main__":
         "Diamond hands on $AMC forever.",
         "$TSLA is way overvalued, shorting it now.",
         "Might hold $NVDA through earnings, not sure.",
-        "I'm going all in on $GME. 🚀🚀🚀"
+        "I'm going all in on $GME."
     ]
     aggregated = aggregate_sentiments(sample_posts)
     print("Aggregated Sentiment per Ticker:")

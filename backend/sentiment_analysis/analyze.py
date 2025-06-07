@@ -26,7 +26,7 @@ def analyze_batch(texts):
 
 if __name__ == "__main__":
     # Example: Single sentence
-    text = "I'm all in on $GME. It's going to the moon 🚀🚀"
+    text = "I'm all in on $GME. It's going to the moon"
     print(analyze_text(text))
 
     # Example: Batch of Reddit-style posts

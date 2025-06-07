@@ -1,17 +1,28 @@
-
 import React, { useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import 'chart.js/auto';
 
 function App() {
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/performance")
-      .then(res => res.json())
-      .then(setData);
+    const fetchPerformance = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/performance");
+        if (!res.ok) throw new Error("Failed to fetch performance data");
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        setError(err.message);
+        console.error("❌ API Error:", err);
+      }
+    };
+
+    fetchPerformance();
   }, []);
 
+  if (error) return <p>Error: {error}</p>;
   if (!data) return <p>Loading...</p>;
 
   const labels = Object.keys(data.sp500);
