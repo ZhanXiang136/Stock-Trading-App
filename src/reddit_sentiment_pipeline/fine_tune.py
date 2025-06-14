@@ -1,0 +1,82 @@
+from datasets import Dataset
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+import pandas as pd
+import os
+
+def load_and_split_csv(csv_path, test_size=0.2):
+    df = pd.read_csv(csv_path)
+    # df = df.rename(columns={"clean_comment": "text", "category": "label"}) #adjust column names if necessary
+    label_map = {-1: 0, 0: 1, 1: 2}
+    df["label"] = df["label"].map(label_map)
+    train_df, test_df = train_test_split(df, test_size=test_size, stratify=df["label"])
+    return Dataset.from_pandas(train_df), Dataset.from_pandas(test_df)
+
+def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./finetuned-finbert"):
+    if os.path.exists(output_dir):
+        print(f"Model already exists at {output_dir}. Skipping training.")
+        return
+
+    dataset_train, dataset_test = load_and_split_csv(csv_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
+
+    def tokenize(batch):
+        return tokenizer(batch["text"], padding=True, truncation=True)
+
+    dataset_train = dataset_train.map(tokenize, batched=True)
+    dataset_test = dataset_test.map(tokenize, batched=True)
+
+    model = AutoModelForSequenceClassification.from_pretrained(model_ckpt, num_labels=3)
+
+    training_args = TrainingArguments(
+        output_dir=output_dir,
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        num_train_epochs=3,
+        logging_dir=f"{output_dir}/logs",
+        load_best_model_at_end=True
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset_train,
+        eval_dataset=dataset_test,
+        tokenizer=tokenizer
+    )
+
+    trainer.train()
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
+def update_model_with_new_data(new_csv, model_dir="./finetuned-finbert"):
+    dataset, _ = load_and_split_csv(new_csv, test_size=0.0)  # All as train
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+
+    def tokenize(batch):
+        return tokenizer(batch["text"], padding=True, truncation=True)
+
+    dataset = dataset.map(tokenize, batched=True)
+
+    training_args = TrainingArguments(
+        output_dir=model_dir,
+        evaluation_strategy="no",
+        save_strategy="epoch",
+        per_device_train_batch_size=16,
+        num_train_epochs=1,
+        logging_dir=f"{model_dir}/logs",
+        load_best_model_at_end=False
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset,
+        tokenizer=tokenizer
+    )
+
+    trainer.train()
+    model.save_pretrained(model_dir)
+    tokenizer.save_pretrained(model_dir)
