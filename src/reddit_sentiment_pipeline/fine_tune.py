@@ -2,6 +2,7 @@ from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 import pandas as pd
 import os
+from sklearn.model_selection import train_test_split
 
 def load_and_split_csv(csv_path, test_size=0.2):
     df = pd.read_csv(csv_path)
@@ -11,16 +12,18 @@ def load_and_split_csv(csv_path, test_size=0.2):
     train_df, test_df = train_test_split(df, test_size=test_size, stratify=df["label"])
     return Dataset.from_pandas(train_df), Dataset.from_pandas(test_df)
 
-def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./finetuned-finbert"):
+def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./model"):
     if os.path.exists(output_dir):
         print(f"Model already exists at {output_dir}. Skipping training.")
         return
 
     dataset_train, dataset_test = load_and_split_csv(csv_path)
     tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
-
+    
     def tokenize(batch):
-        return tokenizer(batch["text"], padding=True, truncation=True)
+        # Sanitize any NaNs or bad types
+        texts = [str(t) if isinstance(t, str) else "" for t in batch["text"]]
+        return tokenizer(texts, padding="max_length", truncation=True)
 
     dataset_train = dataset_train.map(tokenize, batched=True)
     dataset_test = dataset_test.map(tokenize, batched=True)
@@ -29,7 +32,7 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./fi
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
@@ -50,7 +53,7 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./fi
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
 
-def update_model_with_new_data(new_csv, model_dir="./finetuned-finbert"):
+def update_model_with_new_data(new_csv, model_dir="./model"):
     dataset, _ = load_and_split_csv(new_csv, test_size=0.0)  # All as train
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(model_dir)

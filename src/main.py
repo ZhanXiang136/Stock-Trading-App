@@ -1,25 +1,39 @@
-from src.reddit_scraper.scraper import fetch_recent_post_titles
-from src.reddit_sentiment_pipeline.sentiment_signal import aggregate_sentiments, generate_signals
-from src.trading_engine.alpaca_trade import submit_order
 import os
+import datetime as dt
+from reddit_sentiment_pipeline.scrape import fetch_recent_posts
+from reddit_sentiment_pipeline.sentiment_utils import Sentiment_Analyzer
+from reddit_sentiment_pipeline.visualize import plot_sentiment
+from reddit_sentiment_pipeline.fine_tune import fine_tune_from_csv
 
-def main():
-    print("Fetching Reddit posts...")
-    posts = fetch_recent_post_titles(limit=50)
+MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "./model")
+TRAIN_CSV = os.getenv("TRAIN_CSV", "./data/Reddit_Data.csv")
 
-    print("Analyzing sentiments...")
-    sentiment_data = aggregate_sentiments(posts)
-
-    print("📈 Generating trading signals...")
-    signals = generate_signals(sentiment_data)
-
-    for ticker, action in signals.items():
-        if action in ['BUY', 'SELL']:
-            print(f"Executing trade: {action} {ticker}")
-            # Strip the $ before placing order
-            submit_order(ticker[1:], 1, side=action.lower())
-        else:
-            print(f"Holding position on {ticker}")
+def ensure_model_trained():
+    if not os.path.exists(MODEL_DIR):
+        print("Model not found. Fine-tuning model using training data...")
+        fine_tune_from_csv(TRAIN_CSV)
+    else:
+        print(f"Using existing model at: {MODEL_DIR}")
 
 if __name__ == "__main__":
-    main()
+    ensure_model_trained()
+
+    # print("Fetching Reddit posts...")
+    # hours = 72 if dt.datetime.now().weekday() == 0 else 24
+    # raw_posts = fetch_recent_posts(hours=hours)
+
+    # print(f"Fetched {len(raw_posts)} posts. Analyzing sentiment...")
+    # analyzed = analyze_bulk(raw_posts)
+
+    # print("Generating sentiment plot...")
+    # plot_sentiment(analyzed)
+
+    # print("Aggregating sentiments by ticker...")
+    # ticker_data = aggregate_sentiments([post['text'] for post in raw_posts])
+
+    # print("Generating trading signals...")
+    # signals = generate_signals(ticker_data)
+
+    # print("--- Trade Signals ---")
+    # for ticker, signal in signals.items():
+    #     print(f"{ticker}: {signal}")

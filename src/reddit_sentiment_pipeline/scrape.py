@@ -52,15 +52,5 @@ def fetch_recent_posts(hours: int = 24, limit: int = 1000):
 
     return recent_posts
 
-def fetch_recent_posts(limit: int = 1000):
-    """
-    Fetch recent posts from the WallStreetBets subreddit.
-    :param limit: Maximum number of posts to fetch
-    :return: List of recent posts with their details
-    """
-    hours = 72 if dt.datetime.now().weekday == 0 else 24
-    return fetch_recent_posts(hours, limit=limit)
-
-
 if __name__ == "__main__":
     print(fetch_recent_posts(1)[0])

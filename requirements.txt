@@ -69,7 +69,6 @@ typing-inspection==0.4.1
 typing_extensions==4.14.0
 tzdata==2025.2
 update-checker==0.18.0
-urllib3==1.26.17
 uvicorn==0.34.3
 vaderSentiment==3.3.2
 websocket-client==1.8.0
