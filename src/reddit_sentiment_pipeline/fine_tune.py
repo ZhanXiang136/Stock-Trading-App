@@ -3,6 +3,9 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trai
 import pandas as pd
 import os
 from sklearn.model_selection import train_test_split
+import numpy as np
+from sklearn.metrics import accuracy_score, f1_score
+import torch
 
 def load_and_split_csv(csv_path, test_size=0.2):
     df = pd.read_csv(csv_path)
@@ -11,6 +14,14 @@ def load_and_split_csv(csv_path, test_size=0.2):
     df["label"] = df["label"].map(label_map)
     train_df, test_df = train_test_split(df, test_size=test_size, stratify=df["label"])
     return Dataset.from_pandas(train_df), Dataset.from_pandas(test_df)
+
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
+    preds = np.argmax(logits, axis=1)
+    return {
+        "accuracy": accuracy_score(labels, preds),
+        "f1": f1_score(labels, preds, average="weighted")
+    }
 
 def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./model"):
     if os.path.exists(output_dir):
@@ -29,7 +40,7 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./mo
     dataset_test = dataset_test.map(tokenize, batched=True)
 
     model = AutoModelForSequenceClassification.from_pretrained(model_ckpt, num_labels=3)
-
+    print("Here")
     training_args = TrainingArguments(
         output_dir=output_dir,
         eval_strategy="epoch",
@@ -38,7 +49,8 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./mo
         per_device_eval_batch_size=16,
         num_train_epochs=3,
         logging_dir=f"{output_dir}/logs",
-        load_best_model_at_end=True
+        load_best_model_at_end=True,
+        fp16=True if torch.cuda.is_available() else False,
     )
 
     trainer = Trainer(
@@ -46,7 +58,8 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./mo
         args=training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_test,
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics
     )
 
     trainer.train()
@@ -83,3 +96,8 @@ def update_model_with_new_data(new_csv, model_dir="./model"):
     trainer.train()
     model.save_pretrained(model_dir)
     tokenizer.save_pretrained(model_dir)
+
+if __name__ == "__main__":
+    import torch
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("🚀 Using device:", device)

@@ -47,10 +47,11 @@ def fetch_recent_posts(hours: int = 24, limit: int = 1000):
                 'upvotes': post.ups,
                 'downvotes': downvotes,
                 'score': post.score,
-                'comments': comments
+                'comments': comments,
+                'timestamp': post.created_utc,
             })
 
     return recent_posts
 
 if __name__ == "__main__":
-    print(fetch_recent_posts(1)[0])
+    print(fetch_recent_posts(24, 2)[0])

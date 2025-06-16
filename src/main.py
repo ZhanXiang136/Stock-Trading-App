@@ -18,22 +18,33 @@ def ensure_model_trained():
 if __name__ == "__main__":
     ensure_model_trained()
 
-    # print("Fetching Reddit posts...")
-    # hours = 72 if dt.datetime.now().weekday() == 0 else 24
-    # raw_posts = fetch_recent_posts(hours=hours)
+    print("Fetching Reddit posts...")
+    hours = 72 if dt.datetime.now().weekday() == 0 else 24
+    raw_posts = fetch_recent_posts(hours=hours)
 
-    # print(f"Fetched {len(raw_posts)} posts. Analyzing sentiment...")
-    # analyzed = analyze_bulk(raw_posts)
+    for post in raw_posts:
+        title = post.get("title", "")
+        body = post.get("body", "")
+        comments = post.get("comments", [])
+        comment_text = " ".join(comments[:3]) 
+        full_text = f"{title} {body} {comment_text}".strip()
+        post['text'] = full_text
+
+    sentiment_analyzer = Sentiment_Analyzer(model_path=MODEL_DIR)
+
+    print(f"Fetched {len(raw_posts)} posts. Analyzing sentiment...")
+    analyzed = sentiment_analyzer.analyze_bulk(raw_posts)
+    print(analyzed[:5])  # Print first 5 analyzed posts for debugging
 
     # print("Generating sentiment plot...")
     # plot_sentiment(analyzed)
 
-    # print("Aggregating sentiments by ticker...")
-    # ticker_data = aggregate_sentiments([post['text'] for post in raw_posts])
+    print("Aggregating sentiments by ticker...")
+    ticker_data = sentiment_analyzer.aggregate_sentiments(analyzed)
 
-    # print("Generating trading signals...")
-    # signals = generate_signals(ticker_data)
+    print("Generating trading signals...")
+    signals = sentiment_analyzer.generate_signals(ticker_data)
 
-    # print("--- Trade Signals ---")
-    # for ticker, signal in signals.items():
-    #     print(f"{ticker}: {signal}")
+    print("--- Trade Signals ---")
+    for ticker, signal in signals.items():
+        print(f"{ticker}: {signal}")

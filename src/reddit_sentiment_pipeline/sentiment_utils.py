@@ -32,15 +32,17 @@ class Sentiment_Analyzer:
         ticker_data = {}
 
         for post in posts:
-            tickers = self.extract_tickers(post['text'])
-            sentiment = self.sentiment_model(post['text'])[0]
-            label = sentiment['label']
-            score = sentiment['score']
+            if 'tickers' not in post:
+                continue
+            tickers = post['tickers']
+            sentiment = post['sentiment']
+            # label = sentiment['label']
+            # score = sentiment['score']
 
             for ticker in tickers:
                 if ticker not in ticker_data:
                     ticker_data[ticker] = {'positive': 0, 'negative': 0, 'neutral': 0, 'mentions': 0}
-                ticker_data[ticker][label] += 1
+                # ticker_data[ticker][label] += 1
                 ticker_data[ticker]['mentions'] += 1
 
         return ticker_data
