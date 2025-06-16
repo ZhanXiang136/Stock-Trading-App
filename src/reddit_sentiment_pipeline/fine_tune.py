@@ -40,7 +40,7 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./mo
     dataset_test = dataset_test.map(tokenize, batched=True)
 
     model = AutoModelForSequenceClassification.from_pretrained(model_ckpt, num_labels=3)
-    print("Here")
+
     training_args = TrainingArguments(
         output_dir=output_dir,
         eval_strategy="epoch",
@@ -72,20 +72,22 @@ def update_model_with_new_data(new_csv, model_dir="./model"):
     model = AutoModelForSequenceClassification.from_pretrained(model_dir)
 
     def tokenize(batch):
-        return tokenizer(batch["text"], padding=True, truncation=True)
+        # Sanitize any NaNs or bad types
+        texts = [str(t) if isinstance(t, str) else "" for t in batch["text"]]
+        return tokenizer(texts, padding="max_length", truncation=True)
 
     dataset = dataset.map(tokenize, batched=True)
 
     training_args = TrainingArguments(
         output_dir=model_dir,
-        evaluation_strategy="no",
+        eval_strategy="no",
         save_strategy="epoch",
         per_device_train_batch_size=16,
         num_train_epochs=1,
         logging_dir=f"{model_dir}/logs",
-        load_best_model_at_end=False
+        load_best_model_at_end=False,
     )
-
+    
     trainer = Trainer(
         model=model,
         args=training_args,
