@@ -7,8 +7,8 @@ load_dotenv()
 
 # Initialize Alpaca API
 api = tradeapi.REST(
-    os.getenv("ALPACA_API_KEY"),
-    os.getenv("ALPACA_SECRET_KEY"),
+    os.getenv("APCA_API_KEY_ID"),
+    os.getenv("APCA_API_SECRET_KEY"),
     base_url="https://paper-api.alpaca.markets"
 )
 
@@ -45,7 +45,6 @@ def get_position(symbol: str):
         return None
 
 if __name__ == "__main__":
-    # Example usage
-    submit_order("AAPL", 1, "buy")   # Buy 1 share
-    get_position("AAPL")
-    submit_order("AAPL", 1, "sell")  # Sell 1 share
+    print(submit_order("AAPL", 1, "buy"))   # Buy 1 share
+    print(get_position("AAPL"))
+    print(submit_order("AAPL", 1, "sell"))  # Sell 1 share

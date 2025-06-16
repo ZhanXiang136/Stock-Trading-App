@@ -25,6 +25,6 @@ npm install chart.js react-chartjs-2
 npm start
 
 Run backend
-uvicorn src.performance_api.main:app --reload
+uvicorn src.main:app --reload
 
 python -m venv <env_name>

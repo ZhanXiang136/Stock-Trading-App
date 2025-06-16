@@ -24,9 +24,29 @@ def move_nested_to_parent(data: Dict[str, Any], key: str) -> Dict:
         data.update(nested)     # Add its contents to the parent
     return data
 
-def fetch_bot_equity() -> float:
-    account = api.get_account()
-    return float(account.equity)
+def fetch_bot_equity_over_time(days: int = 30) -> dict:
+    history = api.get_portfolio_history(
+        period=f"{days}D",
+        timeframe="1D"
+    )
+
+    equity_timeline = dict(zip(history.timestamp, history.equity))
+
+    # Get the starting equity to compute percentage change
+    timestamps = sorted(equity_timeline.keys())
+    if not timestamps:
+        return {}
+
+    starting_equity = equity_timeline[timestamps[0]] if equity_timeline[timestamps[0]] else 100000
+
+    # Calculate percentage change
+    formatted = {
+        datetime.fromtimestamp(ts).strftime("%Y-%m-%d"): ((equity - starting_equity) / starting_equity) * 100
+
+        for ts, equity in equity_timeline.items()
+    }
+
+    return formatted
 
 def fetch_index_returns() -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
@@ -59,7 +79,7 @@ def get_performance() -> Dict[str, Any]:
         - S&P 500 returns
         - NASDAQ returns
     """
-    bot_equity = fetch_bot_equity()
+    bot_equity = fetch_bot_equity_over_time()
     sp500, nasdaq = fetch_index_returns()
     print("DEBUG:", {
     "sp500": list(sp500.keys())[:5],
@@ -71,3 +91,7 @@ def get_performance() -> Dict[str, Any]:
         "sp500": sp500,
         "nasdaq": nasdaq
     }
+
+if __name__ == "__main__":
+    # For testing purposes
+    print(get_performance())

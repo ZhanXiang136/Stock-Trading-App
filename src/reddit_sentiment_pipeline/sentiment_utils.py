@@ -26,8 +26,6 @@ class Sentiment_Analyzer:
     def analyze_bulk(self, posts):
         return [self.analyze_post(post) for post in posts]
 
-
-
     def aggregate_sentiments(self, posts):
         ticker_data = {}
 
