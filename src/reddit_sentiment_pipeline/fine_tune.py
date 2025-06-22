@@ -86,6 +86,7 @@ def update_model_with_new_data(new_csv, model_dir="./model"):
         num_train_epochs=1,
         logging_dir=f"{model_dir}/logs",
         load_best_model_at_end=False,
+        fp16=True if torch.cuda.is_available() else False
     )
     
     trainer = Trainer(
@@ -99,7 +100,23 @@ def update_model_with_new_data(new_csv, model_dir="./model"):
     model.save_pretrained(model_dir)
     tokenizer.save_pretrained(model_dir)
 
+def upload_model_to_huggingface():
+    from huggingface_hub import HfApi
+
+    api = HfApi(token=os.getenv("HF_TOKEN"))
+    api.upload_folder(
+        folder_path="src\model",
+        repo_id="Zking136/StockTradingAI-Model",
+        repo_type="model",
+    )
+
+def download_model_from_huggingface(repo_id="Zking136/StockTradingAI-Model", local_dir="./model"):
+    from huggingface_hub import snapshot_download
+
+    snapshot_download(repo_id=repo_id, local_dir=local_dir)
+
 if __name__ == "__main__":
-    import torch
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("🚀 Using device:", device)
+    # import torch
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # print("Using device:", device)
+    upload_model_to_huggingface()

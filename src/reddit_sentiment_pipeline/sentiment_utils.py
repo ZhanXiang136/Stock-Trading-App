@@ -1,7 +1,6 @@
-import re
-import json
-from transformers import pipeline, AutoTokenizer
+# src/reddit_sentiment_pipeline/sentiment_utils.py
 
+from transformers import pipeline, AutoTokenizer
 from reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
 
 class Sentiment_Analyzer:
@@ -10,7 +9,6 @@ class Sentiment_Analyzer:
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.sentiment_model = pipeline("sentiment-analysis", model=self.model_path, tokenizer=self.tokenizer)
         #sentiment_pipeline = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment")
-
         self.enhanced_extract_tickers= EnhancedTickerExtractor()
 
 
@@ -57,7 +55,7 @@ class Sentiment_Analyzer:
 
         return ticker_data
 
-    def generate_signals(self, ticker_data, threshold=0.6, mention_threshold=10):
+    def generate_signals(self, ticker_data, threshold=0.6, mention_threshold=1):
         signals = {}
         for ticker, data in ticker_data.items():
             sentiments = []

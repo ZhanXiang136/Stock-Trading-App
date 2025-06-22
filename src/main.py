@@ -1,22 +1,22 @@
 import os
 import datetime as dt
-from src.reddit_sentiment_pipeline.scrape import fetch_recent_posts
-from src.reddit_sentiment_pipeline.sentiment_utils import Sentiment_Analyzer
-from src.reddit_sentiment_pipeline.visualize import plot_sentiment
-from src.reddit_sentiment_pipeline.fine_tune import fine_tune_from_csv
-from src.trading_engine.alpaca_trade import submit_order, get_position
+from reddit_sentiment_pipeline.scrape import fetch_recent_posts
+from reddit_sentiment_pipeline.sentiment_utils import Sentiment_Analyzer
+from reddit_sentiment_pipeline.fine_tune import fine_tune_from_csv
+from trading_engine.alpaca_trade import submit_order, get_position
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.performance_api.performance import get_performance
+from fastapi.responses import RedirectResponse
+from performance_api.performance import get_performance
 
 app = FastAPI()
 
 # Allow frontend to access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["*"],
+    allow_origins=["http://localhost:3000", "https://stocktradingai.netlify.app"],
+    allow_methods=[""],
     allow_headers=["*"]
 )
 
@@ -24,9 +24,12 @@ app.add_middleware(
 def performance():
     return get_performance()
 
+@app.get("/", include_in_schema=False)
+def performance():
+    return RedirectResponse(url="/docs")
 
-MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "./model")
-TRAIN_CSV = os.getenv("TRAIN_CSV", "./data/Reddit_Data.csv")
+
+MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
 
 def ensure_model_trained():
     if not os.path.exists(MODEL_DIR):
@@ -54,10 +57,6 @@ if __name__ == "__main__":
 
     print(f"Fetched {len(raw_posts)} posts. Analyzing sentiment...")
     analyzed = sentiment_analyzer.analyze_bulk(raw_posts)
-    print(analyzed[:5])  # Print first 5 analyzed posts for debugging
-
-    # print("Generating sentiment plot...")
-    # plot_sentiment(analyzed)
 
     print("Aggregating sentiments by ticker...")
     ticker_data = sentiment_analyzer.aggregate_sentiments(analyzed)
@@ -69,9 +68,9 @@ if __name__ == "__main__":
     for ticker, signal in signals.items():
         print(f"{ticker}: {signal}")
 
-    print("Executing trades...")
-    for ticker, signal in signals.items():
-        if signal == "BUY":
-            submit_order(ticker, qty=1, side="buy")
-        elif signal == "SELL":
-            submit_order(ticker, qty=1, side="sell")
+    # print("Executing trades...")
+    # for ticker, signal in signals.items():
+    #     if signal == "BUY":
+    #         submit_order(ticker, qty=1, side="buy")
+    #     elif signal == "SELL":
+    #         submit_order(ticker, qty=1, side="sell")
