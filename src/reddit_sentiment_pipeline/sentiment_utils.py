@@ -1,22 +1,34 @@
 import re
-from transformers import pipeline
-import os
+import json
+from transformers import pipeline, AutoTokenizer
+
+from reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
 
 class Sentiment_Analyzer:
     def __init__(self, model_path="./model"):
         self.model_path = model_path
-        self.sentiment_model = pipeline("sentiment-analysis", model=self.model_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+        self.sentiment_model = pipeline("sentiment-analysis", model=self.model_path, tokenizer=self.tokenizer)
         #sentiment_pipeline = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment")
+
+        self.enhanced_extract_tickers= EnhancedTickerExtractor()
+
 
 
     def extract_tickers(self, text):
-        return re.findall(r"\$[A-Z]{1,5}", text)
+        return self.enhanced_extract_tickers.extract_from_text(text)
 
     def analyze_post(self, post):
-        sentiment = self.sentiment_model(post['text'])[0]
-        tickers = self.extract_tickers(post['text'])
+        text = post['text']
+
+        # Truncate safely if text is too long
+        encoded = self.tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
+        decoded = self.tokenizer.decode(encoded['input_ids'][0], skip_special_tokens=True)
+
+        sentiment = self.sentiment_model(decoded)[0]
+        tickers = self.extract_tickers(text)
         return {
-            'text': post['text'],
+            'text': text,
             'tickers': tickers,
             'sentiment': sentiment['label'],
             'score': sentiment['score'],
@@ -71,3 +83,6 @@ class Sentiment_Analyzer:
             else:
                 signals[ticker] = 'HOLD'
         return signals
+
+if __name__ == "__main__":
+    sa = Sentiment_Analyzer()
