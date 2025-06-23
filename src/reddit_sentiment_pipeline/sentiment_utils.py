@@ -1,10 +1,10 @@
 # src/reddit_sentiment_pipeline/sentiment_utils.py
 
-from transformers import pipeline, AutoTokenizer
-from src.reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
-
 class Sentiment_Analyzer:
     def __init__(self, model_path="./model"):
+        from transformers import pipeline, AutoTokenizer
+        from src.reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
+        
         self.model_path = model_path
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.sentiment_model = pipeline("sentiment-analysis", model=self.model_path, tokenizer=self.tokenizer)

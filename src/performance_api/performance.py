@@ -57,6 +57,8 @@ def fetch_index_returns() -> Tuple[Dict[str, Any], Dict[str, Any]]:
         - S&P 500 returns
         - NASDAQ returns
     """
+    import pandas as pd
+    
     sp500 = yf.download('^GSPC', period='30d', interval='1d', progress=False)['Close']
     nasdaq = yf.download('^IXIC', period='30d', interval='1d', progress=False)['Close']
 

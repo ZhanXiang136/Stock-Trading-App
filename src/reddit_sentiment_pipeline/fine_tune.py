@@ -1,13 +1,10 @@
 from datasets import Dataset
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
-import pandas as pd
 import os
-from sklearn.model_selection import train_test_split
-import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
-import torch
 
 def load_and_split_csv(csv_path, test_size=0.2):
+    import pandas as pd
+    from sklearn.model_selection import train_test_split
+
     df = pd.read_csv(csv_path)
     # df = df.rename(columns={"clean_comment": "text", "category": "label"}) #adjust column names if necessary
     label_map = {-1: 0, 0: 1, 1: 2}
@@ -16,6 +13,9 @@ def load_and_split_csv(csv_path, test_size=0.2):
     return Dataset.from_pandas(train_df), Dataset.from_pandas(test_df)
 
 def compute_metrics(eval_pred):
+    import numpy as np
+    from sklearn.metrics import accuracy_score, f1_score
+
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=1)
     return {
@@ -24,6 +24,9 @@ def compute_metrics(eval_pred):
     }
 
 def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./model"):
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+    import torch
+
     if os.path.exists(output_dir):
         print(f"Model already exists at {output_dir}. Skipping training.")
         return
@@ -67,6 +70,9 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./mo
     tokenizer.save_pretrained(output_dir)
 
 def update_model_with_new_data(new_csv, model_dir="./model"):
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+    import torch
+
     dataset, _ = load_and_split_csv(new_csv, test_size=0.0)  # All as train
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(model_dir)
@@ -105,7 +111,7 @@ def upload_model_to_huggingface():
 
     api = HfApi(token=os.getenv("HF_TOKEN"))
     api.upload_folder(
-        folder_path="src\model",
+        folder_path="src\\model",
         repo_id="Zking136/StockTradingAI-Model",
         repo_type="model",
     )

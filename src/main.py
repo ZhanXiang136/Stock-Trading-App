@@ -1,10 +1,11 @@
 import os
 import datetime as dt
-from src.reddit_sentiment_pipeline.scrape import fetch_recent_posts
 from src.reddit_sentiment_pipeline.sentiment_utils import Sentiment_Analyzer
+
 from src.reddit_sentiment_pipeline.fine_tune import download_model_from_huggingface
 from src.trading_engine.alpaca_trade import submit_order, get_position
 from src.performance_api.performance import get_performance
+from src.reddit_sentiment_pipeline.scrape import fetch_recent_posts
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
