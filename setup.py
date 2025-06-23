@@ -13,7 +13,7 @@ setup(
     description='A Flask application for analyzing Reddit posts and generating stock trading signals based on sentiment analysis',
     entry_points={
         'console_scripts': [
-            'web: gunicorn src.app:app',  
+            'web: uvicorn src.main:app',  
         ],
     },
     classifiers=[

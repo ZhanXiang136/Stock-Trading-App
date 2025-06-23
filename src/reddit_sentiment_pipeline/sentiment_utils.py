@@ -1,7 +1,7 @@
 # src/reddit_sentiment_pipeline/sentiment_utils.py
 
 from transformers import pipeline, AutoTokenizer
-from reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
+from src.reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
 
 class Sentiment_Analyzer:
     def __init__(self, model_path="./model"):
