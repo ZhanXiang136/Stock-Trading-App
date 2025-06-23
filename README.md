@@ -1,104 +1,105 @@
-# 📈 Stock Trading App
+# 📈 AI-Powered Stock Trading App
 
-This project leverages **natural language processing (NLP)** to analyze Reddit discussions from **r/WallStreetBets**, generating buy/sell signals based on **sentiment and ticker frequency**. It simulates trades and visualizes the bot's performance compared to popular indices like the **S&P 500** and **NASDAQ**.
+This project uses **Natural Language Processing (NLP)** and real-time financial data to generate automated trading signals based on sentiment from Reddit’s stock trading subreddits [r/WallStreetBets, r/stock, etc]. It combines AI models with a web dashboard to visualize performance against market indices like the **S&P 500** and **NASDAQ**.
 
 ---
 
 ## 🚀 Features
 
-- 🔍 **Reddit Sentiment Analyzer** using a fine-tuned transformer model (ProsusAI/finbert)
-- 📰 Real-time parsing of Reddit titles/posts for tickers and sentiment
-- 📊 Trade simulation engine with PnL tracking
-- 📈 Dashboard to visualize:
-  - Bot equity over time
-  - Comparison with S&P 500 / NASDAQ
-  - Average sentiment trends per ticker
-- 🧠 Transformer model fine-tuned on Reddit WSB data and Kaggle financial sentiment data
+- 🤖 **Sentiment Analysis**  
+  Fine-tuned Hugging Face transformer model evaluates sentiment of Reddit posts mentioning stocks.
+
+- 💬 **Smart Ticker Extraction**  
+  Recognizes ticker symbols using `$` notation, fuzzy matching (e.g., “Tesla” → `$TSLA`), named entity recognition, and alias mapping.
+
+- 📊 **Performance Visualization**  
+  Frontend dashboard built with React.js to display:
+  - Bot’s equity curve over time
+  - Comparison with S&P 500 and NASDAQ
+  - Last updated timestamp
+
+- 🔁 **Automated Pipeline**  
+  - Scrapes hot posts from WallStreetBets daily
+  - Parses sentiment and tickers
+  - Makes buy/sell decisions based on aggregated sentiment
+  - Logs portfolio value for visualization
 
 ---
 
-## 🛠️ Tech Stack
+## 🧠 Tech Stack
 
-- **Backend:** FastAPI, PRAW (Reddit API), Alpaca API
-- **NLP Model:** ProsusAI/finbert (fine-tuned on custom data)
-- **Frontend:** React.js + Recharts
-- **Database/Storage:** Supabase / PostgreSQL (optional)
-- **Visualization:** Matplotlib, Plotly, or Recharts
-
----
-
-## 📂 Project Structure
-
-```
-src/
-├── reddit_scraper/         # Scrapes r/wallstreetbets posts
-├── sentiment_model/        # Finetuned transformer + preprocessing
-├── trading_bot/            # Trade signal logic and equity simulator
-├── performance_api/        # FastAPI backend to expose equity/performance
-```
+- **Frontend**: React.js + Chart.js
+- **Backend**: FastAPI + Python
+- **ML Framework**: Hugging Face Transformers (`ProsusAI/finbert`)
+- **Data Source**: Reddit API via PRAW
+- **Broker API**: Alpaca API for real-time trading and equity tracking
+- **Hosting**: Render / Netlify 
 
 ---
 
-## ⚙️ Setup Instructions
+## 📂 Directory Structure
 
-1. **Clone the repo**
-
-```bash
-git clone https://github.com/yourusername/stock-trading-app.git
-cd stock-trading-app
 ```
-
-2. **Create `.env` file** (put in the root or appropriate folders)
-
-```env
-REDDIT_CLIENT_ID=your_id
-REDDIT_CLIENT_SECRET=your_secret
-REDDIT_USER_AGENT=WSB Sentiment App
-
-ALPACA_API_KEY=your_alpaca_key
-ALPACA_SECRET_KEY=your_alpaca_secret
-```
-
-3. **Install dependencies**
-
-```bash
-pip install -r requirements.txt
-cd dashboard && npm install
-```
-
-4. **Run backend and frontend**
-
-```bash
-# Backend
-uvicorn src.main:app --reload
-
-# Frontend (on seperate repo)
-cd dashboard
-npm run dev
+/src
+│
+├── reddit_sentiment_pipeline/
+├──├── reddit_scraper/        # Scrapes Reddit posts
+├──├── sentiment_model/       # Fine-tuned transformer model & tokenizer
+├──├── ticker_extractor/      # Enhanced ticker name detection
+├──├── fine_tune/             # Train/Test/Generate Financial model on Reddit lingo
+├── trading_engine/           # Trading logic (buy/sell based on sentiment)
+├── performance_api/          # FastAPI routes for frontend data
+└── data/                     # Company alias + ticker mapping + dataset used
 ```
 
 ---
 
-## 📊 Example Output
+## ✅ Setup Instructions
 
-- `/api/equity`: JSON of equity timeline
-- `/api/sentiment`: Daily average sentiment per ticker
-- `/dashboard`: Live dashboard with visual PnL and market comparison
+1. **Clone the Repository**  
+   ```bash
+   git clone https://github.com/yourusername/stock-trading-app.git
+   cd stock-trading-app
+   ```
+
+2. **Create a virtual environment and install dependencies**  
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment variables**  
+   Create a `.env` file in the root with your keys:
+   ```
+   REDDIT_CLIENT_ID=your_client_id
+   REDDIT_CLIENT_SECRET=your_secret
+   ALPACA_API_KEY=your_alpaca_key
+   ALPACA_SECRET_KEY=your_alpaca_secret
+   ```
+
+4. **Run the Backend API**  
+   ```bash
+   uvicorn src.main:app --reload
+   ```
+
+5. **Start the Frontend**  
+   Open up https://zhanxiangzheng.me/stocktradingai to view the progress history of you bot compared to other indexes
+   At this time, the frontend will only run the api from http://127.0.0.1:8000/ so run your bot locally
 
 ---
 
-## 📜 License & Dataset Credits
+## 👤 Acknowledgments
 
-This project uses the **ProsusAI/finbert** model, fine-tuned with financial sentiment data from:
+This app was trained using data from Kaggle, provided under the Creative Commons license by:
 
-- **Charan Gowda**
-- **Anirudh**
-- **Akshay Pai**
-- **Chaithanya Kumar A** *(dataset owner)*  
-🔖 Dataset licensed under **Creative Commons License** (CC BY 4.0) via Kaggle.
+- Charan Gowda  
+- Anirudh  
+- Akshay Pai  
+- Chaithanya Kumar A
 
 ---
 
-## 🙌 Contributing
+## 📄 License
 
-PRs are welcome! If you’d like to improve sentiment scoring, model training, or UI charts, feel free to open an issue or pull request.
+This project is licensed under the [MIT License](LICENSE).

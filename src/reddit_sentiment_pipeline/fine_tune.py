@@ -1,6 +1,8 @@
 from datasets import Dataset
 import os
 
+MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
+
 def load_and_split_csv(csv_path, test_size=0.2):
     import pandas as pd
     from sklearn.model_selection import train_test_split
@@ -23,12 +25,12 @@ def compute_metrics(eval_pred):
         "f1": f1_score(labels, preds, average="weighted")
     }
 
-def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./model"):
+def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert"):
     from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
     import torch
 
-    if os.path.exists(output_dir):
-        print(f"Model already exists at {output_dir}. Skipping training.")
+    if os.path.exists(MODEL_DIR):
+        print(f"Model already exists at {MODEL_DIR}. Skipping training.")
         return
 
     dataset_train, dataset_test = load_and_split_csv(csv_path)
@@ -45,13 +47,13 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./mo
     model = AutoModelForSequenceClassification.from_pretrained(model_ckpt, num_labels=3)
 
     training_args = TrainingArguments(
-        output_dir=output_dir,
+        output_dir=MODEL_DIR,
         eval_strategy="epoch",
         save_strategy="epoch",
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         num_train_epochs=3,
-        logging_dir=f"{output_dir}/logs",
+        logging_dir=f"{MODEL_DIR}/logs",
         load_best_model_at_end=True,
         fp16=True if torch.cuda.is_available() else False,
     )
@@ -66,16 +68,16 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert", output_dir="./mo
     )
 
     trainer.train()
-    model.save_pretrained(output_dir)
-    tokenizer.save_pretrained(output_dir)
+    model.save_pretrained(MODEL_DIR)
+    tokenizer.save_pretrained(MODEL_DIR)
 
-def update_model_with_new_data(new_csv, model_dir="./model"):
+def update_model_with_new_data(new_csv):
     from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
     import torch
 
     dataset, _ = load_and_split_csv(new_csv, test_size=0.0)  # All as train
-    tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
 
     def tokenize(batch):
         # Sanitize any NaNs or bad types
@@ -85,12 +87,12 @@ def update_model_with_new_data(new_csv, model_dir="./model"):
     dataset = dataset.map(tokenize, batched=True)
 
     training_args = TrainingArguments(
-        output_dir=model_dir,
+        output_dir=MODEL_DIR,
         eval_strategy="no",
         save_strategy="epoch",
         per_device_train_batch_size=16,
         num_train_epochs=1,
-        logging_dir=f"{model_dir}/logs",
+        logging_dir=f"{MODEL_DIR}/logs",
         load_best_model_at_end=False,
         fp16=True if torch.cuda.is_available() else False
     )
@@ -103,23 +105,23 @@ def update_model_with_new_data(new_csv, model_dir="./model"):
     )
 
     trainer.train()
-    model.save_pretrained(model_dir)
-    tokenizer.save_pretrained(model_dir)
+    model.save_pretrained(MODEL_DIR)
+    tokenizer.save_pretrained(MODEL_DIR)
 
 def upload_model_to_huggingface():
     from huggingface_hub import HfApi
 
     api = HfApi(token=os.getenv("HF_TOKEN"))
     api.upload_folder(
-        folder_path="src\\model",
+        folder_path=MODEL_DIR,
         repo_id="Zking136/StockTradingAI-Model",
         repo_type="model",
     )
 
-def download_model_from_huggingface(repo_id="Zking136/StockTradingAI-Model", local_dir="./model"):
+def download_model_from_huggingface(repo_id="Zking136/StockTradingAI-Model"):
     from huggingface_hub import snapshot_download
 
-    snapshot_download(repo_id=repo_id, local_dir=local_dir)
+    snapshot_download(repo_id=repo_id, local_dir=MODEL_DIR)
 
 if __name__ == "__main__":
     # import torch

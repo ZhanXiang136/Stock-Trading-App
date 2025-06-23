@@ -1,13 +1,15 @@
 # src/reddit_sentiment_pipeline/sentiment_utils.py
+import os
+
+MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
 
 class Sentiment_Analyzer:
-    def __init__(self, model_path="./model"):
+    def __init__(self):
         from transformers import pipeline, AutoTokenizer
         from src.reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
         
-        self.model_path = model_path
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-        self.sentiment_model = pipeline("sentiment-analysis", model=self.model_path, tokenizer=self.tokenizer)
+        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+        self.sentiment_model = pipeline("sentiment-analysis", model=MODEL_DIR, tokenizer=self.tokenizer)
         #sentiment_pipeline = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment")
         self.enhanced_extract_tickers= EnhancedTickerExtractor()
 
@@ -52,6 +54,7 @@ class Sentiment_Analyzer:
                     ticker_data[ticker] = {'positive': 0, 'negative': 0, 'neutral': 0, 'mentions': 0}
                 # ticker_data[ticker][label] += 1
                 ticker_data[ticker]['mentions'] += 1
+                ticker_data[ticker][sentiment] += 1
 
         return ticker_data
 
