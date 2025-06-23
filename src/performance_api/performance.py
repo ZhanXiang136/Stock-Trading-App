@@ -1,9 +1,10 @@
-from typing import Dict, Any, Tuple
+from typing import Tuple, Dict, Any
 from datetime import datetime
 from dotenv import load_dotenv
 from alpaca_trade_api.rest import REST
 import os
 import yfinance as yf
+import pandas as pd
 
 load_dotenv()
 
@@ -56,18 +57,20 @@ def fetch_index_returns() -> Tuple[Dict[str, Any], Dict[str, Any]]:
         - S&P 500 returns
         - NASDAQ returns
     """
-    sp500 = yf.download('^GSPC', period='30d', interval='1d')['Close']
-    nasdaq = yf.download('^IXIC', period='30d', interval='1d')['Close']
+    sp500 = yf.download('^GSPC', period='30d', interval='1d', progress=False)['Close']
+    nasdaq = yf.download('^IXIC', period='30d', interval='1d', progress=False)['Close']
 
     sp500_returns = sp500.pct_change().fillna(0).cumsum() * 100
     nasdaq_returns = nasdaq.pct_change().fillna(0).cumsum() * 100
 
-    # Format index to strings
-    sp500_returns.index = sp500_returns.index.strftime('%Y-%m-%d')
-    nasdaq_returns.index = nasdaq_returns.index.strftime('%Y-%m-%d')
+    # Convert index safely before formatting
+    sp500_returns.index = pd.to_datetime(sp500_returns.index).strftime('%Y-%m-%d')
+    nasdaq_returns.index = pd.to_datetime(nasdaq_returns.index).strftime('%Y-%m-%d')
 
-    return move_nested_to_parent(sp500_returns.to_dict(), '^GSPC'), move_nested_to_parent(nasdaq_returns.to_dict(), '^IXIC')
-
+    return (
+        move_nested_to_parent(sp500_returns.to_dict(), '^GSPC'),
+        move_nested_to_parent(nasdaq_returns.to_dict(), '^IXIC')
+    )
 
 def get_performance() -> Dict[str, Any]:
     """

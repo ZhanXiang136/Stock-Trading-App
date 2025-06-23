@@ -29,7 +29,7 @@ def performance():
 
 @app.get("/api/run")
 def run_app():
-    return get_performance()
+    return main()
 
 @app.exception_handler(StarletteHTTPException)
 async def custom_404_handler(request: Request, exc: StarletteHTTPException):
