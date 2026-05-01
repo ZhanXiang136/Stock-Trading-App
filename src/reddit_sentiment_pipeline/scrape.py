@@ -1,6 +1,9 @@
 import praw
 import os
 import datetime as dt
+import time
+import csv
+import yfinance as yf
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
@@ -52,6 +55,65 @@ def fetch_recent_posts(hours: int = 24, limit: int = 1000):
             })
 
     return recent_posts
+
+def get_volatility(ticker_symbol):
+    """
+    Args: a single ticker symbol (str), or a list of symbols (list)
+    Returns: A dictionary mapping the symbol to its beta value.
+    """
+    if not isinstance(ticker_symbol, list):
+        ticker_symbol = [ticker_symbol]
+    
+    filename = "./data/volatility.csv"
+    og_size = len(ticker_symbol)
+    beta_values = {}
+    remove = False
+
+    if os.path.exists(filename): 
+        with open(filename, 'r') as f: 
+            fline = f.readline().strip()
+            try: 
+                creation_date = dt.fromisoformat(fline)
+                if creation_date < dt.today(): 
+                    remove = True
+            except ValueError: 
+                remove = True
+
+    if remove: 
+        os.remove(filename)
+        print("outdated volatility file, delete and remake")  
+
+    if not os.path.exists(filename): 
+        with open(filename, 'w') as f:
+            f.write(f'{dt.today().isoformat()}\n')
+    
+    with open(filename, 'r') as f: 
+        reader = csv.reader(f)
+        for row in reader: 
+            if len(row) == 2: 
+                symbol, beta = row
+                if str(symbol) in ticker_symbol: 
+                    beta_values[symbol] = float(beta) if beta != "None" else None
+                    ticker_symbol.remove(str(symbol))      
+
+    if len(beta_values) == og_size: 
+        return beta_values
+    with open(filename, 'a+') as f: 
+        for symbol in ticker_symbol: 
+            try: 
+                ticker = yf.Ticker(symbol)
+                beta = ticker.info.get("beta")
+                beta_values[symbol] = beta
+                print(f"Fetched beta for {symbol}")
+            except Exception as e: 
+                print(f"Failed {symbol}: {e}")
+                beta = "None"
+                beta_values[symbol] = beta
+
+            f.write(f"{symbol},{beta}\n")
+            time.sleep(1)
+    
+    return beta_values
 
 if __name__ == "__main__":
     print(fetch_recent_posts(24, 2)[0])
