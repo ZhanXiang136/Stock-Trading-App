@@ -64,7 +64,8 @@ def get_volatility(ticker_symbol):
     if not isinstance(ticker_symbol, list):
         ticker_symbol = [ticker_symbol]
     
-    filename = "./data/volatility.csv"
+    ticker_symbol = list(set([sym.upper() for sym in ticker_symbol]))
+    filename = "../data/volatility.csv"
     og_size = len(ticker_symbol)
     beta_values = {}
     remove = False
