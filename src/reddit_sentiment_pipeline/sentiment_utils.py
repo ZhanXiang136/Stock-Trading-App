@@ -3,13 +3,36 @@ import os
 
 MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
 
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+def _env_bool(name: str, default: bool = True) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
 class Sentiment_Analyzer:
     def __init__(self):
-        from transformers import pipeline, AutoTokenizer
         from src.reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-        self.sentiment_model = pipeline("sentiment-analysis", model=MODEL_DIR, tokenizer=self.tokenizer)
+
+        self.use_model = _env_bool("SENTIMENT_USE_MODEL", True)
+        self.tokenizer = None
+        self.sentiment_model = None
+        if self.use_model:
+            from transformers import pipeline, AutoTokenizer
+
+            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+            self.sentiment_model = pipeline("sentiment-analysis", model=MODEL_DIR, tokenizer=self.tokenizer)
         #sentiment_pipeline = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment")
         self.enhanced_extract_tickers= EnhancedTickerExtractor()
 
@@ -21,11 +44,14 @@ class Sentiment_Analyzer:
     def analyze_post(self, post):
         text = post['text']
 
-        # Truncate safely if text is too long
-        encoded = self.tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
-        decoded = self.tokenizer.decode(encoded['input_ids'][0], skip_special_tokens=True)
+        if self.use_model:
+            # Truncate safely if text is too long
+            encoded = self.tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
+            decoded = self.tokenizer.decode(encoded['input_ids'][0], skip_special_tokens=True)
+            sentiment = self.sentiment_model(decoded)[0]
+        else:
+            sentiment = self._lexicon_sentiment(text)
 
-        sentiment = self.sentiment_model(decoded)[0]
         tickers = self.extract_tickers(text)
         return {
             'text': text,
@@ -34,6 +60,32 @@ class Sentiment_Analyzer:
             'score': sentiment['score'],
             'timestamp': post['timestamp']
         }
+
+    @staticmethod
+    def _lexicon_sentiment(text):
+        text = text.lower()
+        bullish_terms = {
+            "buy", "bought", "bull", "bullish", "breakout", "calls", "call",
+            "cheap", "growth", "long", "moon", "mooning", "rally", "rip",
+            "rocket", "squeeze", "strong", "undervalued", "upside",
+        }
+        bearish_terms = {
+            "avoid", "bear", "bearish", "bubble", "crash", "dump", "fall",
+            "fraud", "overvalued", "puts", "put", "recession", "red", "risk",
+            "sell", "short", "weak",
+        }
+
+        words = text.replace("$", " ").replace("/", " ").split()
+        positive_hits = sum(1 for word in words if word.strip(".,!?;:()[]{}\"'") in bullish_terms)
+        negative_hits = sum(1 for word in words if word.strip(".,!?;:()[]{}\"'") in bearish_terms)
+
+        if positive_hits > negative_hits:
+            total = positive_hits + negative_hits
+            return {"label": "positive", "score": positive_hits / total}
+        if negative_hits > positive_hits:
+            total = positive_hits + negative_hits
+            return {"label": "negative", "score": negative_hits / total}
+        return {"label": "neutral", "score": 1.0}
 
     def analyze_bulk(self, posts):
         return [self.analyze_post(post) for post in posts]
@@ -71,12 +123,22 @@ class Sentiment_Analyzer:
     def generate_signals(
         self,
         ticker_data,
-        threshold=0.6,
-        mention_threshold=3,
-        conflict_margin=0.2,
-        volatility_sensitivity=0.05,
-        min_threshold=0.45,
+        threshold=None,
+        mention_threshold=None,
+        conflict_margin=None,
+        volatility_sensitivity=None,
+        min_threshold=None,
     ):
+        threshold = threshold if threshold is not None else _env_float("SIGNAL_THRESHOLD", 0.6)
+        mention_threshold = mention_threshold if mention_threshold is not None else _env_int("SIGNAL_MENTION_THRESHOLD", 3)
+        conflict_margin = conflict_margin if conflict_margin is not None else _env_float("SIGNAL_CONFLICT_MARGIN", 0.2)
+        volatility_sensitivity = (
+            volatility_sensitivity
+            if volatility_sensitivity is not None
+            else _env_float("SIGNAL_VOLATILITY_SENSITIVITY", 0.05)
+        )
+        min_threshold = min_threshold if min_threshold is not None else _env_float("SIGNAL_MIN_THRESHOLD", 0.45)
+
         signals = {}
         for ticker, data in ticker_data.items():
             mentions = data.get('mentions', 0)

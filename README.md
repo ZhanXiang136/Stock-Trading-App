@@ -81,14 +81,25 @@ This project uses **Natural Language Processing (NLP)** and market data to gener
    REDDIT_CLIENT_SECRET=your_secret
    ALPACA_API_KEY=your_alpaca_key
    ALPACA_SECRET_KEY=your_alpaca_secret
+   ALPACA_DATA_FEED=iex
    RUN_API_TOKEN=your_private_run_endpoint_token
    DRY_RUN=true
+   SCHEDULED_TRADING_ENABLED=false
+   SCHEDULED_TRADING_INTERVAL_SECONDS=300
+   SCHEDULED_TRADING_DRY_RUN=true
+   SCHEDULED_TRADING_QTY=1
+   REDDIT_LOOKBACK_HOURS=24
+   REDDIT_POST_LIMIT=1000
+   SIGNAL_THRESHOLD=0.6
+   SIGNAL_MENTION_THRESHOLD=3
+   SIGNAL_CONFLICT_MARGIN=0.2
    ENFORCE_MARKET_HOURS=true
    MAX_DAILY_TRADES=10
    MAX_POSITION_VALUE=1000
    ```
 
    The code also supports Alpaca's standard `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` variable names. `DRY_RUN` defaults to `true`; set it to `false` only when you intentionally want live paper-trading orders submitted.
+   If the Hugging Face model weights are not available locally, set `SENTIMENT_USE_MODEL=false` to use the lightweight local sentiment fallback.
 
 4. **Run the Backend API**  
    ```bash
@@ -121,6 +132,39 @@ This project uses **Natural Language Processing (NLP)** and market data to gener
 
   By default, `dry_run=true`, so the endpoint returns signals without placing orders. Use `dry_run=false` only for Alpaca paper-trading execution.
 
+  You can temporarily make a run more active without editing `.env`:
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/api/run?dry_run=true&qty=1&threshold=0.52&mention_threshold=1&conflict_margin=0.0" \
+    -H "Authorization: Bearer your_private_run_endpoint_token"
+  ```
+
+  For repeated paper-trading runs, set the same knobs in `.env`. A more active profile might use:
+  ```
+  SIGNAL_THRESHOLD=0.52
+  SIGNAL_MENTION_THRESHOLD=1
+  SIGNAL_CONFLICT_MARGIN=0.0
+  MAX_DAILY_TRADES=50
+  MAX_POSITION_VALUE=250
+  ```
+  Keep `DRY_RUN=true` until you have reviewed the trade log and signal quality.
+
+- `GET /api/scheduler`  
+  Returns scheduler status, including whether it is enabled, whether a run is currently active, the last result, and the next scheduled run time.
+
+  To run the pipeline every 5 minutes, set this in `.env` and restart the backend:
+  ```
+  SCHEDULED_TRADING_ENABLED=true
+  SCHEDULED_TRADING_INTERVAL_SECONDS=300
+  SCHEDULED_TRADING_RUN_ON_STARTUP=true
+  SCHEDULED_TRADING_DRY_RUN=true
+  SCHEDULED_TRADING_QTY=1
+  ```
+
+  To submit Alpaca paper orders on the schedule, change only this after reviewing dry-run results:
+  ```
+  SCHEDULED_TRADING_DRY_RUN=false
+  ```
+
 ---
 
 ## 📈 Signal Logic
@@ -130,6 +174,7 @@ Signals are generated from ticker-level aggregated sentiment:
 - Requires at least 3 mentions by default.
 - Weights positive and negative evidence by model confidence score.
 - Holds when positive and negative evidence is too conflicted.
+- Signal aggressiveness can be tuned with `SIGNAL_THRESHOLD`, `SIGNAL_MENTION_THRESHOLD`, and `SIGNAL_CONFLICT_MARGIN`.
 - Fetches each ticker's beta with `yfinance`.
 - For beta above `1.0`, lowers the trading threshold by `0.05` per beta point.
 - The threshold is capped at a minimum of `0.45` to avoid trading on weak sentiment.

@@ -1,21 +1,44 @@
+import asyncio
 import os
 import secrets
 import datetime as dt
+from contextlib import suppress
+from pathlib import Path
 from src.reddit_sentiment_pipeline.sentiment_utils import Sentiment_Analyzer
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
+from dotenv import load_dotenv
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 
+load_dotenv()
+
 app = FastAPI()
 sentiment_analyzer = None
+scheduled_task = None
+scheduled_run_lock = asyncio.Lock()
+scheduled_state = {
+    "enabled": False,
+    "running": False,
+    "last_started_at": None,
+    "last_finished_at": None,
+    "last_result": None,
+    "last_error": None,
+    "next_run_at": None,
+}
 
 # Allow frontend to access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://stocktradingai.netlify.app"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://stocktradingai.netlify.app",
+    ],
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"]
 )
@@ -31,9 +54,18 @@ def run_app(
     request: Request,
     dry_run: bool = Query(True, description="When true, generate signals without placing orders."),
     qty: int = Query(10, ge=1, le=100),
+    threshold: float | None = Query(None, ge=0.5, le=1.0),
+    mention_threshold: int | None = Query(None, ge=1, le=25),
+    conflict_margin: float | None = Query(None, ge=0.0, le=1.0),
 ):
     require_run_token(request)
-    return main(dry_run=dry_run, qty=qty)
+    return main(
+        dry_run=dry_run,
+        qty=qty,
+        threshold=threshold,
+        mention_threshold=mention_threshold,
+        conflict_margin=conflict_margin,
+    )
 
 @app.get("/api/init")
 def init_app():
@@ -42,6 +74,10 @@ def init_app():
         sentiment_analyzer = get_sentiment_analyzer()
         return {"status": "Sentiment Analyzer initialized"}
     return {"status": "Sentiment Analyzer already initialized"}
+
+@app.get("/api/scheduler")
+def scheduler_status():
+    return scheduled_state
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request, exc):
@@ -63,15 +99,56 @@ def performance():
     
 
 MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
+MODEL_WEIGHT_FILENAMES = {
+    "pytorch_model.bin",
+    "model.safetensors",
+    "tf_model.h5",
+    "model.ckpt.index",
+    "flax_model.msgpack",
+}
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
+def model_has_weights(model_dir: str) -> bool:
+    path = Path(model_dir)
+    if not path.exists() or not path.is_dir():
+        return False
+    return any((path / filename).exists() for filename in MODEL_WEIGHT_FILENAMES)
 
 def ensure_model_exists():
-    if not os.path.exists(MODEL_DIR):
+    if not _env_bool("SENTIMENT_USE_MODEL", True):
+        print("SENTIMENT_USE_MODEL=false. Using lightweight local sentiment fallback.")
+        return
+
+    if not model_has_weights(MODEL_DIR):
         from src.reddit_sentiment_pipeline.fine_tune import download_model_from_huggingface
 
-        print("Model not found. Downloading from Repo...")
+        print(f"Model weights not found in {MODEL_DIR}. Downloading from Hugging Face...")
         download_model_from_huggingface()
-    else:
-        print(f"Using existing model at: {MODEL_DIR}")
+
+    if not model_has_weights(MODEL_DIR):
+        raise RuntimeError(
+            f"Model download did not produce a checkpoint in {MODEL_DIR}. "
+            "Expected one of: " + ", ".join(sorted(MODEL_WEIGHT_FILENAMES))
+        )
+
+    print(f"Using existing model at: {MODEL_DIR}")
 
 def get_sentiment_analyzer():
     global sentiment_analyzer
@@ -96,7 +173,88 @@ def require_run_token(request: Request):
     if not valid_bearer and not valid_api_key:
         raise HTTPException(status_code=401, detail="Invalid or missing run token.")
 
-def main(dry_run: bool | None = None, qty: int = 10):
+def get_scheduled_run_config() -> dict:
+    return {
+        "dry_run": _env_bool("SCHEDULED_TRADING_DRY_RUN", True),
+        "qty": _env_int("SCHEDULED_TRADING_QTY", _env_int("TRADE_QTY", 1)),
+        "threshold": _env_float("SIGNAL_THRESHOLD", 0.6),
+        "mention_threshold": _env_int("SIGNAL_MENTION_THRESHOLD", 3),
+        "conflict_margin": _env_float("SIGNAL_CONFLICT_MARGIN", 0.2),
+    }
+
+async def run_scheduled_pipeline_once():
+    if scheduled_run_lock.locked():
+        print("Scheduled trading skipped because the previous run is still active.")
+        return
+
+    async with scheduled_run_lock:
+        scheduled_state["running"] = True
+        scheduled_state["last_started_at"] = dt.datetime.now(dt.UTC).isoformat()
+        scheduled_state["last_error"] = None
+
+        try:
+            result = await asyncio.to_thread(main, **get_scheduled_run_config())
+            scheduled_state["last_result"] = result
+            if isinstance(result, dict) and "Exception Type" in result:
+                scheduled_state["last_error"] = result
+        except Exception as exc:
+            scheduled_state["last_error"] = {
+                "Exception Type": type(exc).__name__,
+                "Exception Message": str(exc),
+            }
+            scheduled_state["last_result"] = None
+            print(f"Scheduled trading failed: {type(exc).__name__}: {exc}")
+        finally:
+            scheduled_state["running"] = False
+            scheduled_state["last_finished_at"] = dt.datetime.now(dt.UTC).isoformat()
+
+async def scheduled_trading_loop():
+    interval_seconds = max(60, _env_int("SCHEDULED_TRADING_INTERVAL_SECONDS", 300))
+    run_on_startup = _env_bool("SCHEDULED_TRADING_RUN_ON_STARTUP", True)
+    scheduled_state["enabled"] = True
+
+    try:
+        if run_on_startup:
+            await run_scheduled_pipeline_once()
+
+        while True:
+            next_run = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=interval_seconds)
+            scheduled_state["next_run_at"] = next_run.isoformat()
+            await asyncio.sleep(interval_seconds)
+            await run_scheduled_pipeline_once()
+    except asyncio.CancelledError:
+        scheduled_state["enabled"] = False
+        scheduled_state["next_run_at"] = None
+        raise
+
+@app.on_event("startup")
+async def start_scheduled_trading():
+    global scheduled_task
+    if not _env_bool("SCHEDULED_TRADING_ENABLED", False):
+        scheduled_state["enabled"] = False
+        return
+
+    if scheduled_task is None or scheduled_task.done():
+        scheduled_task = asyncio.create_task(scheduled_trading_loop())
+
+@app.on_event("shutdown")
+async def stop_scheduled_trading():
+    global scheduled_task
+    if scheduled_task is None:
+        return
+
+    scheduled_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await scheduled_task
+    scheduled_task = None
+
+def main(
+    dry_run: bool | None = None,
+    qty: int = 10,
+    threshold: float | None = None,
+    mention_threshold: int | None = None,
+    conflict_margin: float | None = None,
+):
     try:
         analyzer = get_sentiment_analyzer()
         if dry_run is None:
@@ -105,8 +263,10 @@ def main(dry_run: bool | None = None, qty: int = 10):
         print("Fetching Reddit posts...")
         from src.reddit_sentiment_pipeline.scrape import fetch_recent_posts
 
-        hours = 72 if dt.datetime.now().weekday() == 0 else 24
-        raw_posts = fetch_recent_posts(hours=hours)
+        default_hours = 72 if dt.datetime.now().weekday() == 0 else 24
+        hours = _env_int("REDDIT_LOOKBACK_HOURS", default_hours)
+        post_limit = _env_int("REDDIT_POST_LIMIT", 1000)
+        raw_posts = fetch_recent_posts(hours=hours, limit=post_limit)
 
         for post in raw_posts:
             title = post.get("title", "")
@@ -134,7 +294,23 @@ def main(dry_run: bool | None = None, qty: int = 10):
         print(volatility_data)
 
         print("Generating trading signals...")
-        signals = analyzer.generate_signals(ticker_data)
+        threshold = threshold if threshold is not None else _env_float("SIGNAL_THRESHOLD", 0.6)
+        mention_threshold = (
+            mention_threshold
+            if mention_threshold is not None
+            else _env_int("SIGNAL_MENTION_THRESHOLD", 3)
+        )
+        conflict_margin = (
+            conflict_margin
+            if conflict_margin is not None
+            else _env_float("SIGNAL_CONFLICT_MARGIN", 0.2)
+        )
+        signals = analyzer.generate_signals(
+            ticker_data,
+            threshold=threshold,
+            mention_threshold=mention_threshold,
+            conflict_margin=conflict_margin,
+        )
         print(signals)
 
         print("--- Trade Signals ---")
@@ -192,6 +368,14 @@ def main(dry_run: bool | None = None, qty: int = 10):
         return {
             "status": "success",
             "dry_run": dry_run,
+            "settings": {
+                "qty": qty,
+                "reddit_lookback_hours": hours,
+                "reddit_post_limit": post_limit,
+                "signal_threshold": threshold,
+                "signal_mention_threshold": mention_threshold,
+                "signal_conflict_margin": conflict_margin,
+            },
             "signals": signals,
             "orders_submitted": len([order for order in executed_orders if order is not None]),
         }

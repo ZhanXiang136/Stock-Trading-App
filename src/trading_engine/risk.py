@@ -1,8 +1,6 @@
 import os
 from dataclasses import dataclass
 
-import yfinance as yf
-
 from src.trading_engine.alpaca_trade import get_alpaca_api, get_position
 from src.trading_engine.trade_log import count_submitted_trades_today
 
@@ -30,14 +28,37 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 def get_latest_price(symbol: str) -> float | None:
+    feed = os.getenv("ALPACA_DATA_FEED", "iex").strip() or "iex"
+
     try:
-        history = yf.Ticker(symbol).history(period="1d", interval="1m")
-        if history.empty:
-            return None
-        return float(history["Close"].dropna().iloc[-1])
+        trade = get_alpaca_api().get_latest_trade(symbol, feed=feed)
+        price = getattr(trade, "p", None)
+        if price:
+            return float(price)
     except Exception as exc:
-        print(f"Failed to fetch latest price for {symbol}: {exc}")
-        return None
+        print(f"Failed to fetch latest Alpaca trade for {symbol}: {exc}")
+
+    try:
+        quote = get_alpaca_api().get_latest_quote(symbol, feed=feed)
+        bid_price = float(getattr(quote, "bp", 0) or 0)
+        ask_price = float(getattr(quote, "ap", 0) or 0)
+        if bid_price and ask_price:
+            return (bid_price + ask_price) / 2
+        if ask_price:
+            return ask_price
+        if bid_price:
+            return bid_price
+    except Exception as exc:
+        print(f"Failed to fetch latest Alpaca quote for {symbol}: {exc}")
+
+    try:
+        asset = get_alpaca_api().get_asset(symbol)
+        if not getattr(asset, "tradable", False):
+            print(f"{symbol} is not tradable on Alpaca.")
+    except Exception:
+        pass
+
+    return None
 
 def is_market_open() -> bool:
     try:

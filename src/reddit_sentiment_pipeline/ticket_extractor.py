@@ -30,10 +30,43 @@ class EnhancedTickerExtractor:
                 self.company_map[short_name] = self.company_map[full_name]
         self.fuzzy_threshold = fuzzy_threshold
         self.nlp = spacy.load("en_core_web_sm")
+        self.non_ticker_terms = {
+            "AI",
+            "API",
+            "ATH",
+            "ATM",
+            "CAD",
+            "CEO",
+            "CFO",
+            "CPI",
+            "CRA",
+            "DD",
+            "DTE",
+            "EPS",
+            "ER",
+            "FDA",
+            "FOMC",
+            "GDP",
+            "IPO",
+            "ITM",
+            "IV",
+            "LLM",
+            "NAV",
+            "NI",
+            "OTM",
+            "PE",
+            "REIT",
+            "SEC",
+            "TLDR",
+            "USD",
+            "WSB",
+            "YOLO",
+        }
 
     def extract_from_text(self, text: str) -> List[str]:
         tickers = set()
         tickers.update(self._extract_dollar_tickers(text))
+        tickers.update(self._extract_bare_tickers(text))
         tickers.update(self._match_company_names(text))
         tickers.update(self._match_named_entities(text))
         tickers.update(self._fuzzy_match(text))
@@ -43,6 +76,14 @@ class EnhancedTickerExtractor:
     def _extract_dollar_tickers(self, text: str) -> Set[str]:
         matches = re.findall(r"\$([A-Za-z\-]{1,5})", text)
         return {m.upper() for m in matches if m.upper() in self.ticker_map}
+
+    def _extract_bare_tickers(self, text: str) -> Set[str]:
+        matches = re.findall(r"(?<![$A-Za-z0-9])([A-Z][A-Z0-9]{1,4}(?:-[A-Z])?)(?![A-Za-z0-9])", text)
+        return {
+            match
+            for match in matches
+            if match in self.ticker_map and match not in self.non_ticker_terms
+        }
 
     def _match_company_names(self, text: str) -> Set[str]:
         text_lower = text.lower()
