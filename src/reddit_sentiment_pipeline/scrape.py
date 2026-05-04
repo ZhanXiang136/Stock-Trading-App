@@ -4,6 +4,7 @@ import datetime as dt
 import time
 import csv
 import yfinance as yf
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
@@ -17,6 +18,7 @@ reddit = praw.Reddit(
 )
 
 UTC = ZoneInfo("UTC")
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 def is_within_timeframe(created_utc: float, hours: int):
     """
@@ -65,7 +67,7 @@ def get_volatility(ticker_symbol):
         ticker_symbol = [ticker_symbol]
     
     ticker_symbol = list(set([sym.upper() for sym in ticker_symbol]))
-    filename = "../data/volatility.csv"
+    filename = DATA_DIR / "volatility.csv"
     og_size = len(ticker_symbol)
     beta_values = {}
     remove = False
@@ -74,8 +76,8 @@ def get_volatility(ticker_symbol):
         with open(filename, 'r') as f: 
             fline = f.readline().strip()
             try: 
-                creation_date = dt.fromisoformat(fline)
-                if creation_date < dt.today(): 
+                creation_date = dt.date.fromisoformat(fline)
+                if creation_date < dt.date.today(): 
                     remove = True
             except ValueError: 
                 remove = True
@@ -86,7 +88,7 @@ def get_volatility(ticker_symbol):
 
     if not os.path.exists(filename): 
         with open(filename, 'w') as f:
-            f.write(f'{dt.today().isoformat()}\n')
+            f.write(f'{dt.date.today().isoformat()}\n')
     
     with open(filename, 'r') as f: 
         reader = csv.reader(f)
@@ -108,7 +110,7 @@ def get_volatility(ticker_symbol):
                 print(f"Fetched beta for {symbol}")
             except Exception as e: 
                 print(f"Failed {symbol}: {e}")
-                beta = "None"
+                beta = None
                 beta_values[symbol] = beta
 
             f.write(f"{symbol},{beta}\n")

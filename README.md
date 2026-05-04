@@ -1,6 +1,6 @@
 # 📈 AI-Powered Stock Trading App
 
-This project uses **Natural Language Processing (NLP)** and real-time financial data to generate automated trading signals based on sentiment from Reddit’s stock trading subreddits [r/WallStreetBets, r/stock, etc]. It combines AI models with a web dashboard to visualize performance against market indices like the **S&P 500** and **NASDAQ**.
+This project uses **Natural Language Processing (NLP)** and market data to generate automated trading signals based on sentiment from Reddit stock discussions. It combines a FastAPI backend, a Hugging Face sentiment model, ticker extraction, Alpaca paper trading, and performance data for a frontend dashboard.
 
 ---
 
@@ -19,10 +19,11 @@ This project uses **Natural Language Processing (NLP)** and real-time financial 
   - Last updated timestamp
 
 - 🔁 **Automated Pipeline**  
-  - Scrapes hot posts from WallStreetBets daily
+  - Scrapes recent posts from WallStreetBets
   - Parses sentiment and tickers
-  - Makes buy/sell decisions based on aggregated sentiment
-  - Logs portfolio value for visualization
+  - Makes buy/sell/hold decisions based on aggregated sentiment
+  - Lowers the trading threshold for higher-beta stocks
+  - Uses dry-run mode by default so signals can be reviewed before orders are placed
 
 ---
 
@@ -33,6 +34,7 @@ This project uses **Natural Language Processing (NLP)** and real-time financial 
 - **ML Framework**: Hugging Face Transformers (`ProsusAI/finbert`)
 - **Data Source**: Reddit API via PRAW
 - **Broker API**: Alpaca API for real-time trading and equity tracking
+- **Market Data**: Yahoo Finance via `yfinance` for index returns and stock beta
 - **Hosting**: Render / Netlify 
 
 ---
@@ -42,14 +44,17 @@ This project uses **Natural Language Processing (NLP)** and real-time financial 
 ```
 /src
 │
+├── main.py                         # FastAPI app and pipeline orchestration
 ├── reddit_sentiment_pipeline/
-├──├── reddit_scraper/        # Scrapes Reddit posts
-├──├── sentiment_model/       # Fine-tuned transformer model & tokenizer
-├──├── ticker_extractor/      # Enhanced ticker name detection
-├──├── fine_tune/             # Train/Test/Generate Financial model on Reddit lingo
-├── trading_engine/           # Trading logic (buy/sell based on sentiment)
-├── performance_api/          # FastAPI routes for frontend data
-└── data/                     # Company alias + ticker mapping + dataset used
+│   ├── scrape.py                   # Reddit scraping and volatility/beta lookup
+│   ├── sentiment_utils.py          # Sentiment aggregation and signal generation
+│   ├── ticket_extractor.py         # Ticker name detection
+│   └── fine_tune.py                # Model train/download/upload helpers
+├── trading_engine/
+│   └── alpaca_trade.py             # Alpaca order and position helpers
+├── performance_api/
+│   └── performance.py              # Portfolio/index performance endpoint
+└── data/                           # Ticker maps, aliases, and datasets
 ```
 
 ---
@@ -76,7 +81,14 @@ This project uses **Natural Language Processing (NLP)** and real-time financial 
    REDDIT_CLIENT_SECRET=your_secret
    ALPACA_API_KEY=your_alpaca_key
    ALPACA_SECRET_KEY=your_alpaca_secret
+   RUN_API_TOKEN=your_private_run_endpoint_token
+   DRY_RUN=true
+   ENFORCE_MARKET_HOURS=true
+   MAX_DAILY_TRADES=10
+   MAX_POSITION_VALUE=1000
    ```
+
+   The code also supports Alpaca's standard `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` variable names. `DRY_RUN` defaults to `true`; set it to `false` only when you intentionally want live paper-trading orders submitted.
 
 4. **Run the Backend API**  
    ```bash
@@ -84,8 +96,81 @@ This project uses **Natural Language Processing (NLP)** and real-time financial 
    ```
 
 5. **Start the Frontend**  
-   Open up https://zhanxiangzheng.me/stocktradingai to view the progress history of you bot compared to other indexes
-   At this time, the frontend will only run the api from http://127.0.0.1:8000/ so run your bot locally
+   Open https://zhanxiangzheng.me/stocktradingai to view the bot's performance history compared to market indexes.
+   At this time, the frontend expects the backend API at `http://127.0.0.1:8000/`, so run the backend locally.
+
+---
+
+## 🔌 API Endpoints
+
+- `GET /api/performance`  
+  Returns bot equity history plus S&P 500 and NASDAQ return data.
+
+- `GET /api/init`  
+  Downloads/loads the sentiment model if needed.
+
+- `POST /api/run?dry_run=true&qty=10`  
+  Runs the Reddit sentiment pipeline. This endpoint requires either:
+  ```bash
+  Authorization: Bearer your_private_run_endpoint_token
+  ```
+  or:
+  ```bash
+  x-api-key: your_private_run_endpoint_token
+  ```
+
+  By default, `dry_run=true`, so the endpoint returns signals without placing orders. Use `dry_run=false` only for Alpaca paper-trading execution.
+
+---
+
+## 📈 Signal Logic
+
+Signals are generated from ticker-level aggregated sentiment:
+
+- Requires at least 3 mentions by default.
+- Weights positive and negative evidence by model confidence score.
+- Holds when positive and negative evidence is too conflicted.
+- Fetches each ticker's beta with `yfinance`.
+- For beta above `1.0`, lowers the trading threshold by `0.05` per beta point.
+- The threshold is capped at a minimum of `0.45` to avoid trading on weak sentiment.
+
+Example: with a base threshold of `0.60`, a stock with beta `2.0` uses an adjusted threshold of about `0.55`.
+
+---
+
+## 🛡️ Trade Safety
+
+When `dry_run=false`, the app runs risk checks before submitting an Alpaca paper order:
+
+- Blocks orders when the Alpaca market clock is closed if `ENFORCE_MARKET_HOURS=true`.
+- Blocks new buys when already holding that ticker.
+- Blocks sells when there is no current position.
+- Blocks buys whose estimated order value exceeds `MAX_POSITION_VALUE`.
+- Blocks orders after `MAX_DAILY_TRADES` submitted trades for the current UTC day.
+
+Every signal is logged to `src/data/trade_decisions.csv`, including dry-run signals, submitted orders, risk-check reasons, mentions, sentiment scores, and beta. This file is ignored by git.
+
+---
+
+## 🧪 Training Data
+
+Fine-tuning expects a CSV with:
+
+- `text`: the post/comment text.
+- `label`: one of `-1`, `0`, `1`, `negative`, `neutral`, `positive`, `bearish`, or `bullish`.
+
+The loader drops empty and duplicate text rows, validates labels, requires at least two classes, and uses a reproducible stratified split. For better trading signals, use finance-specific/social-market sentiment data rather than generic sentiment datasets.
+
+---
+
+## 🚀 Deployment
+
+This repo includes Render-style deployment files:
+
+- `runtime.txt`: `python-3.12.7`
+- `Procfile`: `web: uvicorn src.main:app --host 0.0.0.0 --port $PORT`
+
+Set the same environment variables from setup in your hosting provider. Keep `RUN_API_TOKEN` private.
 
 ---
 

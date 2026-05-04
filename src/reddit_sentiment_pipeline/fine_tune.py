@@ -1,18 +1,67 @@
-from datasets import Dataset
 import os
 
 MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
 
 def load_and_split_csv(csv_path, test_size=0.2):
+    from datasets import Dataset
     import pandas as pd
     from sklearn.model_selection import train_test_split
 
     df = pd.read_csv(csv_path)
-    # df = df.rename(columns={"clean_comment": "text", "category": "label"}) #adjust column names if necessary
-    label_map = {-1: 0, 0: 1, 1: 2}
-    df["label"] = df["label"].map(label_map)
-    train_df, test_df = train_test_split(df, test_size=test_size, stratify=df["label"])
-    return Dataset.from_pandas(train_df), Dataset.from_pandas(test_df)
+    df = normalize_training_dataframe(df)
+
+    if test_size == 0:
+        return Dataset.from_pandas(df, preserve_index=False), None
+
+    train_df, test_df = train_test_split(
+        df,
+        test_size=test_size,
+        stratify=df["label"],
+        random_state=42,
+    )
+    return (
+        Dataset.from_pandas(train_df, preserve_index=False),
+        Dataset.from_pandas(test_df, preserve_index=False),
+    )
+
+def normalize_training_dataframe(df):
+    required_columns = {"text", "label"}
+    missing_columns = required_columns - set(df.columns)
+    if missing_columns:
+        raise ValueError(f"Training CSV missing required columns: {sorted(missing_columns)}")
+
+    df = df[["text", "label"]].copy()
+    df["text"] = df["text"].fillna("").astype(str).str.strip()
+    df = df[df["text"] != ""]
+    df = df.drop_duplicates(subset=["text"])
+
+    label_map = {
+        -1: 0,
+        0: 1,
+        1: 2,
+        "-1": 0,
+        "0": 1,
+        "1": 2,
+        "negative": 0,
+        "neutral": 1,
+        "positive": 2,
+        "bearish": 0,
+        "bullish": 2,
+    }
+    df["label"] = df["label"].map(lambda value: label_map.get(str(value).strip().lower(), label_map.get(value)))
+
+    invalid_count = df["label"].isna().sum()
+    if invalid_count:
+        raise ValueError(f"Training CSV contains {invalid_count} rows with unsupported labels.")
+
+    df["label"] = df["label"].astype(int)
+    label_counts = df["label"].value_counts()
+    if len(label_counts) < 2:
+        raise ValueError("Training CSV must contain at least two sentiment classes.")
+    if label_counts.min() < 2:
+        raise ValueError("Each sentiment class must have at least two rows for stratified splitting.")
+
+    return df
 
 def compute_metrics(eval_pred):
     import numpy as np

@@ -5,12 +5,24 @@ import alpaca_trade_api as tradeapi
 # Load API credentials from .env
 load_dotenv()
 
-# Initialize Alpaca API
-api = tradeapi.REST(
-    os.getenv("APCA_API_KEY_ID"),
-    os.getenv("APCA_API_SECRET_KEY"),
-    base_url="https://paper-api.alpaca.markets"
-)
+def get_alpaca_credentials() -> tuple[str, str]:
+    api_key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY")
+    secret_key = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY")
+
+    if not api_key or not secret_key:
+        raise RuntimeError(
+            "Missing Alpaca credentials. Set APCA_API_KEY_ID/APCA_API_SECRET_KEY "
+            "or ALPACA_API_KEY/ALPACA_SECRET_KEY."
+        )
+    return api_key, secret_key
+
+def get_alpaca_api():
+    api_key, secret_key = get_alpaca_credentials()
+    return tradeapi.REST(
+        api_key,
+        secret_key,
+        base_url=os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+    )
 
 def submit_order(symbol: str, qty: int, side: str):
     """
@@ -21,7 +33,7 @@ def submit_order(symbol: str, qty: int, side: str):
         raise ValueError("Side must be 'buy' or 'sell'")
     
     try:
-        order = api.submit_order(
+        order = get_alpaca_api().submit_order(
             symbol=symbol,
             qty=qty,
             side=side,
@@ -37,7 +49,7 @@ def submit_order(symbol: str, qty: int, side: str):
 def get_position(symbol: str):
     """Get current position for a stock symbol."""
     try:
-        pos = api.get_position(symbol)
+        pos = get_alpaca_api().get_position(symbol)
         print(f"You own {pos.qty} share(s) of {symbol} at ${pos.avg_entry_price}")
         return pos
     except:

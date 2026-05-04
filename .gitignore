@@ -18,6 +18,7 @@ logs/
 
 # Downloaded/cache data
 src/data/volatility.csv
+src/data/trade_decisions.csv
 *.sqlite
 *.sqlite3
 

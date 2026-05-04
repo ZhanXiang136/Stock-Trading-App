@@ -8,11 +8,24 @@ import pandas as pd
 
 load_dotenv()
 
-api = REST( # Initialize Alpaca API
-    os.getenv("APCA_API_KEY_ID"),
-    os.getenv("APCA_API_SECRET_KEY"),
-    base_url="https://paper-api.alpaca.markets"
-)
+def get_alpaca_credentials() -> tuple[str, str]:
+    api_key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY")
+    secret_key = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY")
+
+    if not api_key or not secret_key:
+        raise RuntimeError(
+            "Missing Alpaca credentials. Set APCA_API_KEY_ID/APCA_API_SECRET_KEY "
+            "or ALPACA_API_KEY/ALPACA_SECRET_KEY."
+        )
+    return api_key, secret_key
+
+def get_alpaca_api() -> REST:
+    api_key, secret_key = get_alpaca_credentials()
+    return REST(
+        api_key,
+        secret_key,
+        base_url=os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+    )
 
 def move_nested_to_parent(data: Dict[str, Any], key: str) -> Dict:
     """
@@ -26,7 +39,7 @@ def move_nested_to_parent(data: Dict[str, Any], key: str) -> Dict:
     return data
 
 def fetch_bot_equity_over_time(days: int = 30) -> dict:
-    history = api.get_portfolio_history(
+    history = get_alpaca_api().get_portfolio_history(
         period=f"{days}D",
         timeframe="1D"
     )
