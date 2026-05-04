@@ -1,5 +1,25 @@
 # Model Directory
 model/
+src/model/
+
+# OS files
+.DS_Store
+._*
+
+# Local secrets
+.env.*
+!.env.example
+
+# Local runtime artifacts
+logs/
+*.pid
+*.out
+*.err
+
+# Downloaded/cache data
+src/data/volatility.csv
+*.sqlite
+*.sqlite3
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

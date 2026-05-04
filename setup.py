@@ -1,25 +1,29 @@
 from setuptools import setup, find_packages
 
 with open("requirements.txt") as f:
-    requirements = f.read().splitlines()
+    requirements = [
+        line.strip()
+        for line in f
+        if line.strip() and not line.strip().startswith("#")
+    ]
 
 setup(
-    name='Stock Trading AI App',
+    name='stock-trading-ai-app',
     version='0.1.0',
-    packages=find_packages(where='src'),
-    package_dir={'': 'src'},
+    packages=find_packages(),
     include_package_data=True,
     install_requires=requirements,
-    description='A Flask application for analyzing Reddit posts and generating stock trading signals based on sentiment analysis',
+    description='A FastAPI application for analyzing Reddit posts and generating stock trading signals based on sentiment analysis',
     entry_points={
         'console_scripts': [
-            'web: uvicorn src.main:app',  
+            'stock-trading-api=src.main:serve',
         ],
     },
     classifiers=[
         'Programming Language :: Python :: 3',
-        'Framework :: Flask',
+        'Programming Language :: Python :: 3.12',
+        'Framework :: FastAPI',
         'Operating System :: OS Independent',
     ],
-    python_requires='>=3.7',
+    python_requires='>=3.10',
 )

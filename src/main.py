@@ -113,5 +113,11 @@ def main():
     except Exception as e:
         return {"Exception Type": type(e).__name__, "Exception Message": str(e)}
 
+def serve():
+    import uvicorn
+
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("src.main:app", host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
     main()
