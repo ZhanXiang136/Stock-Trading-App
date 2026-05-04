@@ -114,7 +114,7 @@ def get_volatility(ticker_symbol):
                 beta_values[symbol] = beta
 
             f.write(f"{symbol},{beta}\n")
-            time.sleep(1)
+            time.sleep(3)
     
     return beta_values
 

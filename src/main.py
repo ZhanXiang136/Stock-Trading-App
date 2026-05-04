@@ -323,6 +323,7 @@ def main(
         if dry_run:
             print("Dry run enabled. Skipping trade execution.")
             for ticker, signal in signals.items():
+                print(f"Skipping {ticker} {signal}: dry run")
                 append_trade_decision(
                     ticker=ticker,
                     signal=signal,
@@ -348,6 +349,8 @@ def main(
                         order = submit_order(ticker, qty=qty, side="buy")
                         submitted = order is not None
                         executed_orders.append(order)
+                    else:
+                        print(f"Skipping {ticker} BUY: {reason}")
                 elif signal == "SELL":
                     risk_decision = evaluate_trade_risk(ticker, qty=qty, side="sell")
                     reason = risk_decision.reason
@@ -355,6 +358,10 @@ def main(
                         order = submit_order(ticker, qty=qty, side="sell")
                         submitted = order is not None
                         executed_orders.append(order)
+                    else:
+                        print(f"Skipping {ticker} SELL: {reason}")
+                else:
+                    print(f"Skipping {ticker} {signal}: hold signal")
 
                 append_trade_decision(
                     ticker=ticker,

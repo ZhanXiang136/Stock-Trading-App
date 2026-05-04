@@ -37,7 +37,6 @@ def submit_order(symbol: str, qty: int, side: str):
     Submit a market order to Alpaca.
     side: 'buy' or 'sell'
     """
-    qty *= 10
     if side not in ["buy", "sell"]:
         raise ValueError("Side must be 'buy' or 'sell'")
     

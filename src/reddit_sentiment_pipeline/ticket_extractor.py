@@ -35,6 +35,7 @@ class EnhancedTickerExtractor:
             "API",
             "ATH",
             "ATM",
+            "BRO",
             "CAD",
             "CEO",
             "CFO",
