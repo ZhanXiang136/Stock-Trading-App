@@ -1,6 +1,20 @@
 import os
+from pathlib import Path
 
 MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
+MODEL_WEIGHT_FILENAMES = {
+    "pytorch_model.bin",
+    "model.safetensors",
+    "tf_model.h5",
+    "model.ckpt.index",
+    "flax_model.msgpack",
+}
+
+def model_has_weights(model_dir=MODEL_DIR):
+    path = Path(model_dir)
+    if not path.exists() or not path.is_dir():
+        return False
+    return any((path / filename).exists() for filename in MODEL_WEIGHT_FILENAMES)
 
 def load_and_split_csv(csv_path, test_size=0.2):
     from datasets import Dataset
@@ -78,10 +92,11 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert"):
     from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
     import torch
 
-    if os.path.exists(MODEL_DIR):
-        print(f"Model already exists at {MODEL_DIR}. Skipping training.")
+    if model_has_weights(MODEL_DIR):
+        print(f"Model weights already exist at {MODEL_DIR}. Skipping training.")
         return
 
+    Path(MODEL_DIR).mkdir(parents=True, exist_ok=True)
     dataset_train, dataset_test = load_and_split_csv(csv_path)
     tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
     
@@ -93,7 +108,12 @@ def fine_tune_from_csv(csv_path, model_ckpt="ProsusAI/finbert"):
     dataset_train = dataset_train.map(tokenize, batched=True)
     dataset_test = dataset_test.map(tokenize, batched=True)
 
-    model = AutoModelForSequenceClassification.from_pretrained(model_ckpt, num_labels=3)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_ckpt,
+        num_labels=3,
+        id2label={0: "negative", 1: "neutral", 2: "positive"},
+        label2id={"negative": 0, "neutral": 1, "positive": 2},
+    )
 
     training_args = TrainingArguments(
         output_dir=MODEL_DIR,

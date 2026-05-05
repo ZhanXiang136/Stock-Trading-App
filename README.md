@@ -93,13 +93,17 @@ This project uses **Natural Language Processing (NLP)** and market data to gener
    SIGNAL_THRESHOLD=0.6
    SIGNAL_MENTION_THRESHOLD=3
    SIGNAL_CONFLICT_MARGIN=0.2
+   SENTIMENT_MODEL_PATH=src/model
+   SENTIMENT_USE_MODEL=true
+   SENTIMENT_TRAINING_CSV=src/data/Reddit_Data.csv
+   SENTIMENT_BASE_MODEL=ProsusAI/finbert
    ENFORCE_MARKET_HOURS=true
    MAX_DAILY_TRADES=10
    MAX_POSITION_VALUE=1000
    ```
 
    The code also supports Alpaca's standard `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` variable names. `DRY_RUN` defaults to `true`; set it to `false` only when you intentionally want live paper-trading orders submitted.
-   If the Hugging Face model weights are not available locally, set `SENTIMENT_USE_MODEL=false` to use the lightweight local sentiment fallback.
+   If the Hugging Face model weights are not available locally, the app fine-tunes `SENTIMENT_BASE_MODEL` with `SENTIMENT_TRAINING_CSV` and saves the result to `SENTIMENT_MODEL_PATH`. Set `SENTIMENT_USE_MODEL=false` to use the lightweight local sentiment fallback instead.
 
 4. **Run the Backend API**  
    ```bash
@@ -118,7 +122,7 @@ This project uses **Natural Language Processing (NLP)** and market data to gener
   Returns bot equity history plus S&P 500 and NASDAQ return data.
 
 - `GET /api/init`  
-  Downloads/loads the sentiment model if needed.
+  Trains/loads the sentiment model if needed.
 
 - `POST /api/run?dry_run=true&qty=10`  
   Runs the Reddit sentiment pipeline. This endpoint requires either:

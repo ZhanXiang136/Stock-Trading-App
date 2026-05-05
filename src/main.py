@@ -99,6 +99,7 @@ def performance():
     
 
 MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
+DEFAULT_TRAINING_CSV = "src/data/Reddit_Data.csv"
 MODEL_WEIGHT_FILENAMES = {
     "pytorch_model.bin",
     "model.safetensors",
@@ -137,14 +138,19 @@ def ensure_model_exists():
         return
 
     if not model_has_weights(MODEL_DIR):
-        from src.reddit_sentiment_pipeline.fine_tune import download_model_from_huggingface
+        from src.reddit_sentiment_pipeline.fine_tune import fine_tune_from_csv
 
-        print(f"Model weights not found in {MODEL_DIR}. Downloading from Hugging Face...")
-        download_model_from_huggingface()
+        training_csv = os.getenv("SENTIMENT_TRAINING_CSV", DEFAULT_TRAINING_CSV)
+        base_model = os.getenv("SENTIMENT_BASE_MODEL", "ProsusAI/finbert")
+        print(
+            f"Model weights not found in {MODEL_DIR}. "
+            f"Training {base_model} from {training_csv}..."
+        )
+        fine_tune_from_csv(training_csv, model_ckpt=base_model)
 
     if not model_has_weights(MODEL_DIR):
         raise RuntimeError(
-            f"Model download did not produce a checkpoint in {MODEL_DIR}. "
+            f"Model training did not produce a checkpoint in {MODEL_DIR}. "
             "Expected one of: " + ", ".join(sorted(MODEL_WEIGHT_FILENAMES))
         )
 
