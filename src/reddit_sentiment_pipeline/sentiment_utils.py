@@ -1,39 +1,14 @@
-# src/reddit_sentiment_pipeline/sentiment_utils.py
 import os
 
 MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
 
-def _env_float(name: str, default: float) -> float:
-    try:
-        return float(os.getenv(name, str(default)))
-    except ValueError:
-        return default
-
-def _env_int(name: str, default: int) -> int:
-    try:
-        return int(os.getenv(name, str(default)))
-    except ValueError:
-        return default
-
-def _env_bool(name: str, default: bool = True) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.lower() in {"1", "true", "yes", "on"}
-
 class Sentiment_Analyzer:
     def __init__(self):
         from src.reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor
+        from transformers import AutoTokenizer, pipeline
 
-        self.use_model = _env_bool("SENTIMENT_USE_MODEL", True)
-        self.tokenizer = None
-        self.sentiment_model = None
-        if self.use_model:
-            from transformers import pipeline, AutoTokenizer
-
-            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-            self.sentiment_model = pipeline("sentiment-analysis", model=MODEL_DIR, tokenizer=self.tokenizer)
-        #sentiment_pipeline = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment")
+        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+        self.sentiment_model = pipeline("sentiment-analysis", model=MODEL_DIR, tokenizer=self.tokenizer)
         self.enhanced_extract_tickers= EnhancedTickerExtractor()
 
 
@@ -44,13 +19,9 @@ class Sentiment_Analyzer:
     def analyze_post(self, post):
         text = post['text']
 
-        if self.use_model:
-            # Truncate safely if text is too long
-            encoded = self.tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
-            decoded = self.tokenizer.decode(encoded['input_ids'][0], skip_special_tokens=True)
-            sentiment = self.sentiment_model(decoded)[0]
-        else:
-            sentiment = self._lexicon_sentiment(text)
+        encoded = self.tokenizer(text, truncation=True, max_length=512, return_tensors="pt")
+        decoded = self.tokenizer.decode(encoded['input_ids'][0], skip_special_tokens=True)
+        sentiment = self.sentiment_model(decoded)[0]
 
         tickers = self.extract_tickers(text)
         return {
@@ -60,32 +31,6 @@ class Sentiment_Analyzer:
             'score': sentiment['score'],
             'timestamp': post['timestamp']
         }
-
-    @staticmethod
-    def _lexicon_sentiment(text):
-        text = text.lower()
-        bullish_terms = {
-            "buy", "bought", "bull", "bullish", "breakout", "calls", "call",
-            "cheap", "growth", "long", "moon", "mooning", "rally", "rip",
-            "rocket", "squeeze", "strong", "undervalued", "upside",
-        }
-        bearish_terms = {
-            "avoid", "bear", "bearish", "bubble", "crash", "dump", "fall",
-            "fraud", "overvalued", "puts", "put", "recession", "red", "risk",
-            "sell", "short", "weak",
-        }
-
-        words = text.replace("$", " ").replace("/", " ").split()
-        positive_hits = sum(1 for word in words if word.strip(".,!?;:()[]{}\"'") in bullish_terms)
-        negative_hits = sum(1 for word in words if word.strip(".,!?;:()[]{}\"'") in bearish_terms)
-
-        if positive_hits > negative_hits:
-            total = positive_hits + negative_hits
-            return {"label": "positive", "score": positive_hits / total}
-        if negative_hits > positive_hits:
-            total = positive_hits + negative_hits
-            return {"label": "negative", "score": negative_hits / total}
-        return {"label": "neutral", "score": 1.0}
 
     def analyze_bulk(self, posts):
         return [self.analyze_post(post) for post in posts]

@@ -133,10 +133,6 @@ def model_has_weights(model_dir: str) -> bool:
     return any((path / filename).exists() for filename in MODEL_WEIGHT_FILENAMES)
 
 def ensure_model_exists():
-    if not _env_bool("SENTIMENT_USE_MODEL", True):
-        print("SENTIMENT_USE_MODEL=false. Using lightweight local sentiment fallback.")
-        return
-
     if not model_has_weights(MODEL_DIR):
         from src.reddit_sentiment_pipeline.fine_tune import fine_tune_from_csv
 

@@ -94,7 +94,6 @@ This project uses **Natural Language Processing (NLP)** and market data to gener
    SIGNAL_MENTION_THRESHOLD=3
    SIGNAL_CONFLICT_MARGIN=0.2
    SENTIMENT_MODEL_PATH=src/model
-   SENTIMENT_USE_MODEL=true
    SENTIMENT_TRAINING_CSV=src/data/Reddit_Data.csv
    SENTIMENT_BASE_MODEL=ProsusAI/finbert
    ENFORCE_MARKET_HOURS=true
@@ -103,7 +102,7 @@ This project uses **Natural Language Processing (NLP)** and market data to gener
    ```
 
    The code also supports Alpaca's standard `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` variable names. `DRY_RUN` defaults to `true`; set it to `false` only when you intentionally want live paper-trading orders submitted.
-   If the Hugging Face model weights are not available locally, the app fine-tunes `SENTIMENT_BASE_MODEL` with `SENTIMENT_TRAINING_CSV` and saves the result to `SENTIMENT_MODEL_PATH`. Set `SENTIMENT_USE_MODEL=false` to use the lightweight local sentiment fallback instead.
+   If the Hugging Face model weights are not available locally, the app fine-tunes `SENTIMENT_BASE_MODEL` with `SENTIMENT_TRAINING_CSV` and saves the result to `SENTIMENT_MODEL_PATH`.
 
 4. **Run the Backend API**  
    ```bash
