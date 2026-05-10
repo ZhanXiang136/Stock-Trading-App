@@ -2,6 +2,18 @@ import os
 
 MODEL_DIR = os.getenv("SENTIMENT_MODEL_PATH", "src/model")
 
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
 class Sentiment_Analyzer:
     def __init__(self):
         from src.reddit_sentiment_pipeline.ticket_extractor import EnhancedTickerExtractor

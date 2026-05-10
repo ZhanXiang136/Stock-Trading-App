@@ -190,9 +190,11 @@ async def run_scheduled_pipeline_once():
         return
 
     async with scheduled_run_lock:
+        started_at = dt.datetime.now(dt.UTC)
         scheduled_state["running"] = True
-        scheduled_state["last_started_at"] = dt.datetime.now(dt.UTC).isoformat()
+        scheduled_state["last_started_at"] = started_at.isoformat()
         scheduled_state["last_error"] = None
+        print(f"Scheduled trading run started at {started_at.isoformat()}")
 
         try:
             result = await asyncio.to_thread(main, **get_scheduled_run_config())
@@ -208,12 +210,15 @@ async def run_scheduled_pipeline_once():
             print(f"Scheduled trading failed: {type(exc).__name__}: {exc}")
         finally:
             scheduled_state["running"] = False
-            scheduled_state["last_finished_at"] = dt.datetime.now(dt.UTC).isoformat()
+            finished_at = dt.datetime.now(dt.UTC)
+            scheduled_state["last_finished_at"] = finished_at.isoformat()
+            print(f"Scheduled trading run finished at {finished_at.isoformat()}")
 
 async def scheduled_trading_loop():
     interval_seconds = max(60, _env_int("SCHEDULED_TRADING_INTERVAL_SECONDS", 300))
     run_on_startup = _env_bool("SCHEDULED_TRADING_RUN_ON_STARTUP", True)
     scheduled_state["enabled"] = True
+    print(f"Scheduled trading enabled. Interval: {interval_seconds} seconds.")
 
     try:
         if run_on_startup:
@@ -222,6 +227,7 @@ async def scheduled_trading_loop():
         while True:
             next_run = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=interval_seconds)
             scheduled_state["next_run_at"] = next_run.isoformat()
+            print(f"Next scheduled trading run at {next_run.isoformat()}")
             await asyncio.sleep(interval_seconds)
             await run_scheduled_pipeline_once()
     except asyncio.CancelledError:
